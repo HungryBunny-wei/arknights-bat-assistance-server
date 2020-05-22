@@ -4,7 +4,13 @@ import platform from 'platform';
 import config from '../config/client';
 import store from './state/store';
 import { guest, loginByToken, getLinkmansLastMessages, getLinkmanHistoryMessages } from './service';
-import { ActionTypes, SetLinkmanPropertyPayload, AddLinkmanHistoryMessagesPayload, AddLinkmanMessagePayload, DeleteMessagePayload } from './state/action';
+import {
+    ActionTypes,
+    SetLinkmanPropertyPayload,
+    AddLinkmanHistoryMessagesPayload,
+    AddLinkmanMessagePayload,
+    DeleteMessagePayload,
+} from './state/action';
 import convertMessage from '../utils/convertMessage';
 import getFriendId from '../utils/getFriendId';
 import notification from '../utils/notification';
@@ -39,11 +45,39 @@ async function loginFailback() {
     }
 }
 
+// 监听获取父窗口传来的token
+const getTokenPromise: Promise<string> = new Promise<string>((resolve) => {
+    const tid = setTimeout(() => {
+        resolve('');
+    }, 10000);
+    window.addEventListener('message', ($event) => {
+        if ($event.data.type === 'getTokenCallback') {
+            clearTimeout(tid);
+            window.localStorage.setItem('token', $event.data.data);
+            resolve($event.data.data);
+        }
+    });
+});
+
+// 获取父节点token
+async function getParentToken(): Promise<string> {
+    let token = window.localStorage.getItem('token');
+    if (token) {
+        return token;
+    }
+    if (window.parent) {
+        window.parent.postMessage({ type: 'getToken' }, '*');
+        token = await getTokenPromise;
+        return token;
+    }
+    return '';
+}
+
 socket.on('connect', async () => {
     // @ts-ignore
     dispatch({ type: ActionTypes.Connect, payload: null });
 
-    const token = window.localStorage.getItem('token');
+    const token = await getParentToken();
     if (token) {
         const user = await loginByToken(
             token,
@@ -82,8 +116,12 @@ socket.on('disconnect', () => {
 });
 
 let windowStatus = 'focus';
-window.onfocus = () => { windowStatus = 'focus'; };
-window.onblur = () => { windowStatus = 'blur'; };
+window.onfocus = () => {
+    windowStatus = 'focus';
+};
+window.onblur = () => {
+    windowStatus = 'blur';
+};
 
 let prevFrom: string | null = '';
 let prevName = '';
@@ -190,7 +228,7 @@ socket.on('message', async (message: any) => {
     }
 });
 
-socket.on('changeGroupName', ({ groupId, name }: {groupId: string, name: string}) => {
+socket.on('changeGroupName', ({ groupId, name }: { groupId: string, name: string }) => {
     dispatch({
         type: ActionTypes.SetLinkmanProperty,
         payload: {
@@ -201,7 +239,7 @@ socket.on('changeGroupName', ({ groupId, name }: {groupId: string, name: string}
     });
 });
 
-socket.on('deleteGroup', ({ groupId }: {groupId: string}) => {
+socket.on('deleteGroup', ({ groupId }: { groupId: string }) => {
     dispatch({
         type: ActionTypes.RemoveLinkman,
         payload: groupId,
@@ -217,7 +255,7 @@ socket.on('changeTag', (tag: string) => {
     });
 });
 
-socket.on('deleteMessage', ({ linkmanId, messageId }: {linkmanId: string, messageId: string}) => {
+socket.on('deleteMessage', ({ linkmanId, messageId }: { linkmanId: string, messageId: string }) => {
     dispatch({
         type: ActionTypes.DeleteMessage,
         payload: {

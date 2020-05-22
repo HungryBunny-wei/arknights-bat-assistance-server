@@ -21,6 +21,7 @@ import * as groupRoutes from './routes/group';
 import * as messageRoutes from './routes/message';
 import * as qiniuRoutes from './routes/qiniu';
 import * as systemRoutes from './routes/system';
+import * as characterRoutes from './routes/character';
 
 const app = new Koa();
 app.proxy = true;
@@ -35,7 +36,7 @@ app.use(async (ctx, next) => {
                 root: path.join(__dirname, '../public'),
                 maxage: 1000 * 60 * 60 * 24 * 7,
                 gzip: true,
-            } // eslint-disable-line
+            }, // eslint-disable-line
         );
     } else {
         await next();
@@ -49,7 +50,7 @@ app.use(koaStatic(
     {
         maxAge: 1000 * 60 * 60 * 24 * 7,
         gzip: true,
-    } // eslint-disable-line
+    }, // eslint-disable-line
 ));
 
 const io = new IO({
@@ -82,7 +83,12 @@ io.use(route(
     // @ts-ignore
     app._io,
     {
-        ...userRoutes, ...groupRoutes, ...messageRoutes, ...qiniuRoutes, ...systemRoutes,
+        ...userRoutes,
+        ...groupRoutes,
+        ...messageRoutes,
+        ...qiniuRoutes,
+        ...systemRoutes,
+        ...characterRoutes,
     },
 ));
 
