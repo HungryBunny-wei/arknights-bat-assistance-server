@@ -106,7 +106,10 @@ export async function changeCharacter(ctx: KoaContext<ChangeCharacterData>) {
 
 
 interface GetSupportListData {
-    code: string
+    code?: string
+    page: {
+        index?: number,
+    }
 }
 
 
@@ -116,6 +119,8 @@ interface GetSupportListData {
  */
 export async function getSupportList(ctx: KoaContext<GetSupportListData>) {
     const { data } = ctx;
+    assert(data.page, '分页参数不能为空');
+    const start = (data.page.index || 0) * 5;
     const conditions: any = {};
     if (data.code) {
         conditions.code = data.code;
@@ -123,7 +128,13 @@ export async function getSupportList(ctx: KoaContext<GetSupportListData>) {
     const result = await Character.find(
         conditions,
         undefined,
-        { sort: { createTime: -1 }, limit: 200 },
-    ).populate('creator', { _id: 1, username: 1, avatar: 1, tag: 1 });
-    return result;
+        { sort: { phase: -1, level: -1, potentialRank: 1 } },
+    ).skip(start).limit(start + 5).populate('creator', { _id: 1, username: 1, avatar: 1, tag: 1 });
+    const count = await Character.find(
+        conditions,
+    ).count();
+    return {
+        result,
+        total: count,
+    };
 }

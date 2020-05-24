@@ -12,7 +12,7 @@ export default {
     port: options.port || env.Port || 9200,
 
     // mongodb address
-    database: options.database || env.Database || 'mongodb://localhost:27017/fiora',
+    database: options.database || env.Database || 'mongodb://47.106.106.88:27017/fiora',
 
     // jwt encryption secret
     jwtSecret: options.jwtSecret || env.JwtSecret || 'jwtSecret',

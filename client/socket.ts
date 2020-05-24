@@ -3,7 +3,7 @@ import platform from 'platform';
 
 import config from '../config/client';
 import store from './state/store';
-import { guest, loginByToken, getLinkmansLastMessages, getLinkmanHistoryMessages } from './service';
+import { guest, loginByToken, getLinkmansLastMessages, getLinkmanHistoryMessages, addFriend } from './service';
 import {
     ActionTypes,
     SetLinkmanPropertyPayload,
@@ -61,13 +61,13 @@ const getTokenPromise: Promise<string> = new Promise<string>((resolve) => {
 
 // 获取父节点token
 async function getParentToken(): Promise<string> {
-    let token = window.localStorage.getItem('token');
-    if (token) {
-        return token;
-    }
     if (window.parent) {
         window.parent.postMessage({ type: 'getToken' }, '*');
-        token = await getTokenPromise;
+        const token = await getTokenPromise;
+        return token;
+    }
+    const token = window.localStorage.getItem('token');
+    if (token) {
         return token;
     }
     return '';
@@ -103,6 +103,11 @@ socket.on('connect', async () => {
                 type: ActionTypes.SetLinkmansLastMessages,
                 payload: linkmanMessages,
             });
+            // 告诉父节点初始化完
+            if (window.parent) {
+                console.log('linkmanListViewInit');
+                window.parent.postMessage({ type: 'linkmanListViewInit' }, '*');
+            }
             return null;
         }
     }
@@ -265,4 +270,58 @@ socket.on('deleteMessage', ({ linkmanId, messageId }: { linkmanId: string, messa
     });
 });
 
+// 监听获取父元素发送加好友提示
+const addFriendPromise: Promise<string> = new Promise<string>((resolve) => {
+    window.addEventListener('message', async ($event) => {
+        if ($event.data.type === 'addFriend') {
+            const state = store.getState();
+            const friendId = $event.data.data;
+            const linkmanId = getFriendId(state.user?._id as string, friendId);
+            const linkman = state.linkmans[linkmanId];
+            if (linkman) {
+                console.log('我和他已经是好友了');
+                dispatch({
+                    type: ActionTypes.SetFocus,
+                    payload: linkmanId,
+                });
+            } else {
+                const friend: any = await addFriend(friendId);
+                const newLinkman = {
+                    _id: linkmanId,
+                    from: state.user?._id,
+                    to: {
+                        _id: friendId,
+                        username: friend.username,
+                        avatar: friend.avatar,
+                    },
+                    type: 'friend',
+                    createTime: Date.now(),
+                };
+
+                dispatch({
+                    type: ActionTypes.AddLinkman,
+                    payload: {
+                        linkman: newLinkman as unknown as Linkman,
+                        focus: true,
+                    },
+                });
+                // @ts-ignore
+                const messages = await getLinkmanHistoryMessages(state.user?._id, 0);
+                if (messages) {
+                    messages.forEach(convertMessage);
+                    dispatch({
+                        type: ActionTypes.AddLinkmanHistoryMessages,
+                        payload: {
+                            linkmanId: state.user?._id,
+                            messages,
+                        },
+                    });
+                }
+                console.log('添加好友:', $event.data.data);
+            }
+            resolve($event.data);
+        }
+    });
+});
+addFriendPromise.then();
 export default socket;
